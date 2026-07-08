@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CData OLT Config Migration Tool</title>
+<style>
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+.container { max-width: 1400px; margin: auto; }
+.card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+h1 { margin-top: 0; color: #f59e0b; text-transform: uppercase; font-size: 24px; letter-spacing: 1px; margin-bottom: 5px; }
+.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
+textarea { width: 100%; height: 550px; background: #020617; font-family: 'Consolas', monospace; font-size: 13px; color: #ffffff; border: 1px solid #475569; border-radius: 8px; box-sizing: border-box; resize: none; line-height: 1.5; padding: 15px; }
+.input-box { border-color: #38bdf8; color: #e2e8f0; }
+.output-box { border-color: #10b981; color: #10b981; }
+button { background: #2563eb; color: #ffffff; font-weight: bold; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-right: 10px; }
+button:hover { background: #1d4ed8; transform: translateY(-1px); }
+.btn-orange { background: #f59e0b; color: #000; }
+.btn-orange:hover { background: #fbbf24; }
+.btn-green { background: #10b981; color: #fff; }
+.btn-green:hover { background: #059669; }
+label { font-size: 12px; color: #94a3b8; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>CData OLT Config Migration Tool</h1>
+    <div class="subtitle">Designed for Network Operations & Firmware Upgrades — ProSolve BD</div>
+
+    <div class="card">
+        <button onclick="convertConfig()" class="btn-orange">⚡ Convert Configuration</button>
+        <button onclick="copyOutput()" class="btn-green">📋 Copy New Config</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+
+    <div class="grid">
+        <div>
+            <label style="color:#38bdf8;">[1] Paste Old Version OLT Config Here</label>
+            <textarea id="oldConfig" class="input-box" placeholder="Paste your complete old version CData OLT config here..."></textarea>
+        </div>
+        <div>
+            <label style="color:#10b981;">[2] Generated New Version OLT Config</label>
+            <textarea id="newConfig" class="output-box" readonly placeholder="Converted configuration will appear here..."></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+function convertConfig() {
+    const rawInput = document.getElementById('oldConfig').value;
+    if(!rawInput.trim()) {
+        alert("Please paste the old configuration first!");
+        return;
+    }
+
+    const lines = rawInput.split(/\r?\n/);
+    let outputLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let trimmed = line.trim();
+
+        // ১. ont-lineprofile -> ont-line-profile কনভার্সন এবং ম্যাপিং ইঞ্জেকশন
+        if (trimmed.startsWith('ont-lineprofile ')) {
+            line = line.replace('ont-lineprofile ', 'ont-line-profile ');
+            outputLines.push(line);
+            continue;
+        }
+        
+        // line-profile এর ভেতর tcont লাইনের আগে নতুন ২ টি কমান্ড পুশ করা
+        if (trimmed.startsWith('tcont 1 dba-profile-id')) {
+            // আগের লাইনের স্পেস মেইনটেইন করার জন্য ইন্ডেন্টেশন বের করা
+            let indent = line.match(/^\s*/)[0]; 
+            outputLines.push(indent + "no gem mapping 1 1");
+            outputLines.push(indent + "gem delete 1");
+            outputLines.push(line);
+            continue;
+        }
+
+        // ২. ont-srvprofile -> ont-srv-profile কনভার্সন
+        if (trimmed.startsWith('ont-srvprofile ')) {
+            line = line.replace('ont-srvprofile ', 'ont-srv-profile ');
+            outputLines.push(line);
+            continue;
+        }
+
+        // ৩. service-port <number> -> service-port autoindex কনভার্সন
+        if (trimmed.startsWith('service-port ')) {
+            // Regex দিয়ে service-port এর পরের ডিজিট বা নাম্বারকে রিপ্লেস করে autoindex বসানো হচ্ছে
+            line = line.replace(/^(\s*service-port\s+)\d+/, '$1autoindex');
+            outputLines.push(line);
+            continue;
+        }
+
+        // ৪. অন্য সব নরমাল লাইন হুবহু বসে যাবে
+        outputLines.push(line);
+    }
+
+    document.getElementById('newConfig').value = outputLines.join('\n');
+}
+
+function copyOutput() {
+    const outputText = document.getElementById('newConfig').value;
+    if(!outputText) {
+        alert("Nothing to copy! Generate the config first.");
+        return;
+    }
+    navigator.clipboard.writeText(outputText);
+    alert("New configuration copied to clipboard!");
+}
+
+function clearAll() {
+    document.getElementById('oldConfig').value = '';
+    document.getElementById('newConfig').value = '';
+}
+</script>
+</body>
+</html>
